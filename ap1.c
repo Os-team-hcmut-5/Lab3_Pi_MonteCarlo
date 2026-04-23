@@ -22,7 +22,7 @@ int countInCircle(Point *points, int num_points) {
 
 int main() {
     // 10 triệu điểm
-    long long num_points = 1e9; 
+    long long num_points = 1e8; 
     
     Point *points = (Point *)malloc(num_points * sizeof(Point));
     
@@ -31,7 +31,7 @@ int main() {
         return 1;
     }
 
-    unsigned int seed = 200; 
+    unsigned int seed = 42; 
     srand(seed);
 
     // Tạo dữ liệu
