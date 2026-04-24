@@ -1,57 +1,43 @@
+#define _POSIX_C_SOURCE 200112L
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
-typedef struct {
-    double x;
-    double y;
-} Point;
-
-// Hàm đếm số điểm nằm trong hình tròn
-int countInCircle(Point *points, int num_points) {
-    int count = 0;
-    for (int i = 0; i < num_points; i++) {
-        // Tính x^2 + y^2
-        double distance_sq = points[i].x * points[i].x + points[i].y * points[i].y;
-        
-        if (distance_sq <= 1.0) {
-            count++;
-        }
-    }
-    return count;
+double get_time() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec + ts.tv_nsec / 1e9;
 }
 
 int main() {
-    // 10 triệu điểm
-    long long num_points = 1e8; 
-    
-    Point *points = (Point *)malloc(num_points * sizeof(Point));
-    
-    if (points == NULL) {
-        fprintf(stderr, "Không đủ bộ nhớ!\n");
-        return 1;
-    }
-
+    // 100 Million points 
+    long long num_points = 100000000LL; 
+    long long count = 0;
     unsigned int seed = 42; 
-    srand(seed);
 
-    // Tạo dữ liệu
-    for (int i = 0; i < num_points; i++) {
-        points[i].x = ((double)rand() / RAND_MAX) * 2.0 - 1.0;
-        points[i].y = ((double)rand() / RAND_MAX) * 2.0 - 1.0;
-    }
+    printf("Total Points: %lld\n", num_points);
+    printf("--------------------------------------------------------------------------------\n");
 
-    // Gọi hàm tính toán
-    int inside_count = countInCircle(points, num_points);
-
-    // Hiển thị kết quả
-    // printf("Tong so diem: %d\n", num_points);
-    // printf("So diem nam trong hinh tron: %d\n", inside_count);
+    double start_time = get_time();
     
-    // Tính xấp xỉ số Pi: Pi = 4 * (inside / total)
-    double pi_approx = 4.0 * inside_count / num_points;
-    printf("Gia tri xap xi cua Pi: %f\n", pi_approx);
+    // Calculate on the fly (no massive arrays in memory)
+    for (long long i = 0; i < num_points; i++) {
+        double x = (double)rand_r(&seed) / RAND_MAX;
+        double y = (double)rand_r(&seed) / RAND_MAX;
+        
+        if (x * x + y * y <= 1.0) {
+            count++;
+        }
+    }
+    
+    double end_time = get_time();
+    double execution_time = end_time - start_time;
 
-    free(points);
+    double pi_approx = 4.0 * count / num_points;
+    
+    printf("Pi Estimate: %f\n", pi_approx);
+    printf("Execution Time: %f seconds\n", execution_time);
+    printf("--------------------------------------------------------------------------------\n");
+
     return 0;
 }
-
