@@ -2,6 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include "mt19937-64.c"
+
+void init_genrand64(unsigned long long seed);
+double genrand64_real2(void);
+
 
 double get_time() {
     struct timespec ts;
@@ -13,17 +18,22 @@ int main() {
     // 100 Million points 
     long long num_points = 100000000LL; 
     long long count = 0;
-    unsigned int seed = 42; 
+    
+    // Mersenne Twister uses a 64-bit seed
+    unsigned long long seed = 42ULL; 
+
+    // Seed the Mersenne Twister 
+    init_genrand64(seed);
 
     printf("Total Points: %lld\n", num_points);
     printf("--------------------------------------------------------------------------------\n");
 
     double start_time = get_time();
     
-    // Calculate on the fly (no massive arrays in memory)
     for (long long i = 0; i < num_points; i++) {
-        double x = (double)rand_r(&seed) / RAND_MAX;
-        double y = (double)rand_r(&seed) / RAND_MAX;
+
+        double x = genrand64_real2() * 2.0 - 1.0;
+        double y = genrand64_real2() * 2.0 - 1.0;
         
         if (x * x + y * y <= 1.0) {
             count++;

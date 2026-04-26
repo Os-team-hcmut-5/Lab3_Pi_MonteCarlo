@@ -3,21 +3,30 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <time.h>
+#include "mt19937-64.c" // Including directly (Method 2)
+
+// Tell the compiler these functions exist
+void init_genrand64(unsigned long long seed);
+double genrand64_real2(void);
 
 typedef struct {
     long long num_points;
-    unsigned int seed;
+    unsigned long long seed; // Updated to 64-bit seed
     long long points_inside;
 } ThreadData;
 
 void* calculate_pi_worker(void* arg) {
     ThreadData* data = (ThreadData*)arg;
     long long local_count = 0;
-    unsigned int seed = data->seed;
+    
+    // 1. Seed the Mersenne Twister strictly for this thread
+    init_genrand64(data->seed);
     
     for (long long i = 0; i < data->num_points; i++) {
-        double x = (double)rand_r(&seed) / RAND_MAX;
-        double y = (double)rand_r(&seed) / RAND_MAX;
+        // 2. genrand64_real2() returns a float in [0.0, 1.0)
+        // Multiply by 2.0 and subtract 1.0 to get exactly [-1.0, 1.0)
+        double x = genrand64_real2() * 2.0 - 1.0;
+        double y = genrand64_real2() * 2.0 - 1.0;
         
         if (x * x + y * y <= 1.0) {
             local_count++;
@@ -35,7 +44,6 @@ double get_time() {
 }
 
 int main() {
-    // Standardized to 100 Million points
     const long long TOTAL_POINTS = 100000000LL; 
     
     int thread_counts[] = {1, 2, 4, 8, 16, 32, 64, 100};
@@ -60,7 +68,10 @@ int main() {
 
         for (int i = 0; i < N; i++) {
             thread_data[i].num_points = points_per_thread + (i == 0 ? remaining_points : 0);
-            thread_data[i].seed = 42 + i;
+            
+            // Assign a unique 64-bit seed to each thread
+            thread_data[i].seed = 42ULL + i; 
+            
             thread_data[i].points_inside = 0;
             
             pthread_create(&threads[i], NULL, calculate_pi_worker, &thread_data[i]);

@@ -3,24 +3,34 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <time.h>
+#include "mt19937-64.c" 
 
+// Tell the compiler these MT functions exist
+void init_genrand64(unsigned long long seed);
+double genrand64_real2(void);
+
+// Shared global state and mutex lock
 long long global_points_inside = 0;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct {
     long long num_points;
-    unsigned int seed;
+    unsigned long long seed; // Updated to 64-bit for MT
 } ThreadData;
 
 void* calculate_pi_worker(void* arg) {
     ThreadData* data = (ThreadData*)arg;
-    unsigned int seed = data->seed;
+    
+    // Seed the Mersenne Twister for this specific thread
+    init_genrand64(data->seed);
     
     for (long long i = 0; i < data->num_points; i++) {
-        double x = (double)rand_r(&seed) / RAND_MAX;
-        double y = (double)rand_r(&seed) / RAND_MAX;
+        // Generate high-precision floats directly mapped to [-1.0, 1.0)
+        double x = genrand64_real2() * 2.0 - 1.0;
+        double y = genrand64_real2() * 2.0 - 1.0;
         
         if (x * x + y * y <= 1.0) {
+            // Critical Section: Severe Contention Point
             pthread_mutex_lock(&mutex);
             global_points_inside++;
             pthread_mutex_unlock(&mutex);
@@ -57,13 +67,17 @@ int main() {
         pthread_t threads[N];
         ThreadData thread_data[N];
 
+        // Reset global counter for each test run
         global_points_inside = 0;
 
         double start_time = get_time();
 
         for (int i = 0; i < N; i++) {
             thread_data[i].num_points = points_per_thread + (i == 0 ? remaining_points : 0);
-            thread_data[i].seed = 42 + i;
+            
+            // Unique 64-bit seed per thread
+            thread_data[i].seed = 42ULL + i;
+            
             pthread_create(&threads[i], NULL, calculate_pi_worker, &thread_data[i]);
         }
 

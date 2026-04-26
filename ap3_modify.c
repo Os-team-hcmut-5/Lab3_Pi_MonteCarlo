@@ -3,29 +3,39 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <time.h>
+#include "mt19937-64.c" // Import your thread-safe Mersenne Twister
+
+// Tell the compiler these MT functions exist
+void init_genrand64(unsigned long long seed);
+double genrand64_real2(void);
 
 long long global_points_inside = 0;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct {
     long long num_points;
-    unsigned int seed;
+    unsigned long long seed; // Updated to 64-bit for Mersenne Twister
     long long sync_freq; 
 } ThreadData;
 
 void* calculate_pi_worker(void* arg) {
     ThreadData* data = (ThreadData*)arg;
-    unsigned int seed = data->seed;
+    
+    // Seed the Mersenne Twister strictly for this thread
+    init_genrand64(data->seed);
+    
     long long local_batch_inside = 0;
 
     for (long long i = 0; i < data->num_points; i++) {
-        double x = (double)rand_r(&seed) / RAND_MAX;
-        double y = (double)rand_r(&seed) / RAND_MAX;
+        // Generate high-precision floats mapped to [-1.0, 1.0)
+        double x = genrand64_real2() * 2.0 - 1.0;
+        double y = genrand64_real2() * 2.0 - 1.0;
         
         if (x * x + y * y <= 1.0) {
             local_batch_inside++;
         }
 
+        // Synchronization Frequency Logic
         if ((i + 1) % data->sync_freq == 0) {
             pthread_mutex_lock(&mutex);
             global_points_inside += local_batch_inside;
@@ -34,6 +44,7 @@ void* calculate_pi_worker(void* arg) {
         }
     }
     
+    // Catch any remaining points after the loop finishes
     if (local_batch_inside > 0) {
         pthread_mutex_lock(&mutex);
         global_points_inside += local_batch_inside;
@@ -52,7 +63,7 @@ double get_time() {
 void run_experiment(long long total_points, int* threads_arr, int num_threads, long long sync_freq, const char* label) {
     double t_single = 0.0;
 
-    printf("\n=== Thí nghiệm: %s (Cập nhật mỗi %lld vòng lặp) ===\n", label, sync_freq);
+    printf("\n=== Experiment: %s (Update every %lld iterations) ===\n", label, sync_freq);
     printf("--------------------------------------------------------------------------------\n");
     printf("%-10s | %-12s | %-15s | %-10s\n", "Threads", "Pi Estimate", "Time (seconds)", "Speedup");
     printf("--------------------------------------------------------------------------------\n");
@@ -70,8 +81,11 @@ void run_experiment(long long total_points, int* threads_arr, int num_threads, l
 
         for (int i = 0; i < N; i++) {
             thread_data[i].num_points = points_per_thread + (i == 0 ? remaining_points : 0);
-            thread_data[i].seed = 42 + i;
             
+            // Assign a unique 64-bit seed to each thread
+            thread_data[i].seed = 42ULL + i;
+            
+            // If sync_freq is 0, it means we only sync once at the very end (Local Accumulation)
             thread_data[i].sync_freq = (sync_freq == 0) ? thread_data[i].num_points : sync_freq;
             
             pthread_create(&threads[i], NULL, calculate_pi_worker, &thread_data[i]);
@@ -97,16 +111,18 @@ void run_experiment(long long total_points, int* threads_arr, int num_threads, l
 }
 
 int main() {
-    // Standardized to 100 Million points
+    // 100 Million points
     const long long TOTAL_POINTS = 100000000LL; 
     int thread_counts[] = {1, 2, 4, 8, 16, 32, 64, 100};
     int num_configs = sizeof(thread_counts) / sizeof(thread_counts[0]);
 
-    printf("Tổng số điểm (Total Points): %lld\n", TOTAL_POINTS);
+    printf("Total Points: %lld\n", TOTAL_POINTS);
 
-    run_experiment(TOTAL_POINTS, thread_counts, num_configs, 1, "Shared Accumulation - Cực cao");
-    run_experiment(TOTAL_POINTS, thread_counts, num_configs, 10000, "Shared Accumulation - Trung bình");
-    run_experiment(TOTAL_POINTS, thread_counts, num_configs, 0, "Local Accumulation (Tiệm cận lý tưởng)");
+    run_experiment(TOTAL_POINTS, thread_counts, num_configs, 1, "Shared Accumulation - Extreme Contention");
+    
+    run_experiment(TOTAL_POINTS, thread_counts, num_configs, 10000, "Shared Accumulation - Moderate Contention");
+    
+    run_experiment(TOTAL_POINTS, thread_counts, num_configs, 0, "Local Accumulation (Near Ideal)");
 
     pthread_mutex_destroy(&mutex);
     return 0;
