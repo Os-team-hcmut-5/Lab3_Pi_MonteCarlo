@@ -4,38 +4,32 @@
 #include <pthread.h>
 #include <time.h>
 #include "mt19937-64.c" 
-
-// Tell the compiler these MT functions exist
 void init_genrand64(unsigned long long seed);
 double genrand64_real2(void);
 
-// Shared global state and mutex lock
-long long global_points_inside = 0;
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-
 typedef struct {
     long long num_points;
-    unsigned long long seed; // Updated to 64-bit for MT
+    unsigned long long seed; // Updated to 64-bit seed
+    long long points_inside;
 } ThreadData;
 
 void* calculate_pi_worker(void* arg) {
     ThreadData* data = (ThreadData*)arg;
+    long long local_count = 0;
     
-    // Seed the Mersenne Twister for this specific thread
+    // 1. Seed the Mersenne Twister strictly for this thread
     init_genrand64(data->seed);
     
     for (long long i = 0; i < data->num_points; i++) {
-        // Generate high-precision floats directly mapped to [-1.0, 1.0)
         double x = genrand64_real2() * 2.0 - 1.0;
         double y = genrand64_real2() * 2.0 - 1.0;
         
         if (x * x + y * y <= 1.0) {
-            // Critical Section: Severe Contention Point
-            pthread_mutex_lock(&mutex);
-            global_points_inside++;
-            pthread_mutex_unlock(&mutex);
+            local_count++;
         }
     }
+    
+    data->points_inside = local_count;
     pthread_exit(NULL);
 }
 
@@ -46,7 +40,6 @@ double get_time() {
 }
 
 int main() {
-    // Standardized to 100 Million points
     const long long TOTAL_POINTS = 100000000LL; 
     
     int thread_counts[] = {1, 2, 4, 8, 16, 32, 64, 100};
@@ -55,8 +48,8 @@ int main() {
 
     printf("Total Points: %lld\n", TOTAL_POINTS);
     printf("--------------------------------------------------------------------------------\n");
-    printf("%-10s | %-12s | %-15s | %-10s\n", 
-           "Threads", "Pi Estimate", "Time (seconds)", "Speedup");
+    printf("%-10s | %-12s | %-15s | %-10s | %-10s\n", 
+           "Threads", "Pi Estimate", "Time (seconds)", "Speedup", "Points/Thread");
     printf("--------------------------------------------------------------------------------\n");
 
     for (int t = 0; t < num_configs; t++) {
@@ -67,38 +60,39 @@ int main() {
         pthread_t threads[N];
         ThreadData thread_data[N];
 
-        // Reset global counter for each test run
-        global_points_inside = 0;
-
         double start_time = get_time();
 
         for (int i = 0; i < N; i++) {
             thread_data[i].num_points = points_per_thread + (i == 0 ? remaining_points : 0);
             
-            // Unique 64-bit seed per thread
-            thread_data[i].seed = 42ULL + i;
+            // Assign a unique 64-bit seed to each thread
+            thread_data[i].seed = 42ULL + i; 
+            
+            thread_data[i].points_inside = 0;
             
             pthread_create(&threads[i], NULL, calculate_pi_worker, &thread_data[i]);
         }
 
+        long long total_points_inside = 0;
         for (int i = 0; i < N; i++) {
             pthread_join(threads[i], NULL);
+            total_points_inside += thread_data[i].points_inside;
         }
 
         double end_time = get_time();
         double execution_time = end_time - start_time;
-        double pi_estimate = 4.0 * ((double)global_points_inside / TOTAL_POINTS);
+        double pi_estimate = 4.0 * ((double)total_points_inside / TOTAL_POINTS);
 
         if (N == 1) {
             t_single = execution_time;
         }
+
         double speedup = t_single / execution_time;
 
-        printf("%-10d | %-12.6f | %-15.6f | %-10.2fx\n", 
-               N, pi_estimate, execution_time, speedup);
+        printf("%-10d | %-12.6f | %-15.6f | %-10.2fx | %-10lld\n", 
+               N, pi_estimate, execution_time, speedup, points_per_thread);
     }
 
     printf("--------------------------------------------------------------------------------\n");
-    pthread_mutex_destroy(&mutex);
     return 0;
 }

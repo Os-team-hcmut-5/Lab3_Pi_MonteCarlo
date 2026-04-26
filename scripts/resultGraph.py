@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 
-# Data from your results
+# Data from results
 threads = [1, 2, 4, 8, 16, 32, 64, 100]
 thread_labels = [str(t) for t in threads] # Use strings for equal spacing
 x_pos = range(len(threads)) # 0, 1, 2, 3, 4, 5, 6, 7
@@ -27,7 +27,6 @@ ax1.set_title('Execution Time vs. Number of Threads', fontsize=14)
 ax1.grid(True, linestyle=':', alpha=0.6)
 ax1.legend()
 
-# Right Plot: Speedup (using x_pos for equal spacing)
 ax2.plot(x_pos, speedup_ap2, 'bo-', label='Approach 2 (Local)', linewidth=2)
 ax2.plot(x_pos, speedup_ap3, 'rs--', label='Approach 3 (Shared Mutex)', linewidth=2)
 ax2.axhline(y=1.0, color='gray', linestyle='-.', alpha=0.5, label='Baseline (1 Thread)')
@@ -40,4 +39,5 @@ ax2.grid(True, linestyle=':', alpha=0.6)
 ax2.legend()
 
 plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-plt.savefig('performance_comparison.png', dpi=300)
+plt.savefig('../results/performance_comparison.png', dpi=300)
+print("Saved to ../results/performance_comparison.png")

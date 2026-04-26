@@ -3,9 +3,8 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <time.h>
-#include "mt19937-64.c" // Import your thread-safe Mersenne Twister
+#include "mt19937-64.c" 
 
-// Tell the compiler these MT functions exist
 void init_genrand64(unsigned long long seed);
 double genrand64_real2(void);
 
@@ -27,7 +26,6 @@ void* calculate_pi_worker(void* arg) {
     long long local_batch_inside = 0;
 
     for (long long i = 0; i < data->num_points; i++) {
-        // Generate high-precision floats mapped to [-1.0, 1.0)
         double x = genrand64_real2() * 2.0 - 1.0;
         double y = genrand64_real2() * 2.0 - 1.0;
         
@@ -35,7 +33,6 @@ void* calculate_pi_worker(void* arg) {
             local_batch_inside++;
         }
 
-        // Synchronization Frequency Logic
         if ((i + 1) % data->sync_freq == 0) {
             pthread_mutex_lock(&mutex);
             global_points_inside += local_batch_inside;
@@ -44,7 +41,6 @@ void* calculate_pi_worker(void* arg) {
         }
     }
     
-    // Catch any remaining points after the loop finishes
     if (local_batch_inside > 0) {
         pthread_mutex_lock(&mutex);
         global_points_inside += local_batch_inside;
@@ -111,7 +107,6 @@ void run_experiment(long long total_points, int* threads_arr, int num_threads, l
 }
 
 int main() {
-    // 100 Million points
     const long long TOTAL_POINTS = 100000000LL; 
     int thread_counts[] = {1, 2, 4, 8, 16, 32, 64, 100};
     int num_configs = sizeof(thread_counts) / sizeof(thread_counts[0]);
